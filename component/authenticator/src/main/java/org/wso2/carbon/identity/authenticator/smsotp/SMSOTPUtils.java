@@ -83,19 +83,26 @@ public class SMSOTPUtils {
             userRealm = realmService.getTenantUserRealm(tenantId);
             username = MultitenantUtils.getTenantAwareUsername(String.valueOf(username));
             boolean isEnablingControlledByUser = isSMSOTPEnableOrDisableByUser(context);
+            log.error("otp initiateAuthenticationRequest: userrealm check ");
             if (userRealm != null) {
                 if (isEnablingControlledByUser) {
                     Map<String, String> claimValues = userRealm.getUserStoreManager().getUserClaimValues(username,
                             new String[]{SMSOTPConstants.USER_SMSOTP_DISABLED_CLAIM_URI}, null);
-                    return Boolean.parseBoolean(claimValues.get(SMSOTPConstants.USER_SMSOTP_DISABLED_CLAIM_URI));
+
+                    Boolean something= Boolean.parseBoolean(claimValues.get(SMSOTPConstants.USER_SMSOTP_DISABLED_CLAIM_URI));
+                    log.error("otp initiateAuthenticationRequest: Boolean.parseBoolean: "+something);
+                    return something;
                 }
             } else {
+                log.error("otp initiateAuthenticationRequest: Cannot find the user realm for the given tenant domain ");
                 throw new SMSOTPException("Cannot find the user realm for the given tenant domain : " + CarbonContext
                         .getThreadLocalCarbonContext().getTenantDomain());
             }
         } catch (UserStoreException e) {
+            log.error("otp initiateAuthenticationRequest: Failed while trying to access userRealm of the user ");
             throw new SMSOTPException("Failed while trying to access userRealm of the user : " + username, e);
         }
+        log.error("otp initiateAuthenticationRequest: isSMSOTPDisableForLocalUser last ");
         return false;
     }
 

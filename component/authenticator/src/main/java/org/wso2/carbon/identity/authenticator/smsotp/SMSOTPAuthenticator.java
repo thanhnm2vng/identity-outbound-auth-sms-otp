@@ -29,6 +29,8 @@ import org.owasp.encoder.Encode;
 import org.wso2.carbon.extension.identity.helper.FederatedAuthenticatorUtil;
 import org.wso2.carbon.extension.identity.helper.IdentityHelperConstants;
 import org.wso2.carbon.extension.identity.helper.util.IdentityHelperUtil;
+import org.wso2.carbon.identity.application.authentication.framework.ApplicationAuthenticator;
+
 import org.wso2.carbon.identity.application.authentication.framework.AbstractApplicationAuthenticator;
 import org.wso2.carbon.identity.application.authentication.framework.AuthenticatorFlowStatus;
 import org.wso2.carbon.identity.application.authentication.framework.FederatedApplicationAuthenticator;
@@ -117,6 +119,7 @@ public class SMSOTPAuthenticator extends AbstractApplicationAuthenticator implem
             throws AuthenticationFailedException, LogoutFailedException {
         // if the logout request comes, then no need to go through and complete the flow.
         if (context.isLogoutRequest()) {
+            log.error("otp process: context.isLogoutRequest");
             return AuthenticatorFlowStatus.SUCCESS_COMPLETED;
         } else if (StringUtils.isNotEmpty(request.getParameter(SMSOTPConstants.MOBILE_NUMBER))) {
             // if the request comes with MOBILE_NUMBER, it will go through this flow.
@@ -124,8 +127,11 @@ public class SMSOTPAuthenticator extends AbstractApplicationAuthenticator implem
             return AuthenticatorFlowStatus.INCOMPLETE;
         } else if (StringUtils.isEmpty(request.getParameter(SMSOTPConstants.CODE))) {
             // if the request comes with code, it will go through this flow.
+            log.error("otp process: StringUtils.isEmpty");
+            context.getProperties().forEach((key, value) -> log.error("before ___thanhnm2 otp process: StringUtils.isEmpty: ___"+key + " ::: " + value));
             initiateAuthenticationRequest(request, response, context);
             publishPostSMSOTPGeneratedEvent(request, context);
+
             if (context.getProperty(SMSOTPConstants.AUTHENTICATION)
                     .equals(SMSOTPConstants.AUTHENTICATOR_NAME)) {
                 // if the request comes with authentication is SMSOTP, it will go through this flow.
@@ -153,6 +159,8 @@ public class SMSOTPAuthenticator extends AbstractApplicationAuthenticator implem
                                                  AuthenticationContext context) throws AuthenticationFailedException {
 
         try {
+            log.error("otp initiateAuthenticationRequest ");
+
             String username;
             AuthenticatedUser authenticatedUser;
             String mobileNumber;
@@ -164,19 +172,42 @@ public class SMSOTPAuthenticator extends AbstractApplicationAuthenticator implem
             FederatedAuthenticatorUtil.setUsernameFromFirstStep(context);
             username = String.valueOf(context.getProperty(SMSOTPConstants.USER_NAME));
             authenticatedUser = (AuthenticatedUser) context.getProperty(SMSOTPConstants.AUTHENTICATED_USER);
+            log.error("otp initiateAuthenticationRequest: authenticatedUser: " + authenticatedUser);
+            log.error("otp initiateAuthenticationRequest: username: " + username);
+
+            //thanhnm2
+            StepConfig stepConfig2 = context.getSequenceConfig().getStepMap().get(context.getCurrentStep() - 1);
+            ApplicationAuthenticator applicationAuthenticator2 = stepConfig2.getAuthenticatedAutenticator()
+                    .getApplicationAuthenticator();
+            if (applicationAuthenticator2.getName().contains("IdentifierExecutor") || applicationAuthenticator2.getName().contains("OIDCAuthenticator")) {
+                log.error("otp initiateAuthenticationRequest setting");
+                context.setProperty(IdentityHelperConstants.USER_NAME, authenticatedUser.getUserName());
+                username=authenticatedUser.getUserName();
+                log.error("otp initiateAuthenticationRequest setting: "+ username);
+            }
+            
+
+            //username="thanhnm777@gmail.com@carbon.super";
             // find the authenticated user.
+            
             if (authenticatedUser == null) {
                 if (log.isDebugEnabled()) {
                     log.debug("Authentication failed: Could not find the authenticated user. ");
                 }
+                log.error("otp initiateAuthenticationRequest throw new AuthenticationFailedException ");
                 throw new AuthenticationFailedException
                         ("Authentication failed: Cannot proceed further without identifying the user. ");
             }
+            log.error("otp initiateAuthenticationRequest: isSMSOTPMandatory = SMSOTPUtils.isSMSOTPMandatory(context);");
+
             boolean isSMSOTPMandatory = SMSOTPUtils.isSMSOTPMandatory(context);
             boolean isUserExists = FederatedAuthenticatorUtil.isUserExistInUserStore(username);
+            log.error("otp initiateAuthenticationRequest: checkboolean: isUserExists: "+isUserExists);
+
             String queryParams = FrameworkUtils.getQueryStringWithFrameworkContextId(context.getQueryParams(),
                     context.getCallerSessionKey(), context.getContextIdentifier());
             String errorPage = getErrorPage(context);
+
             // SMS OTP authentication is mandatory and user doesn't disable SMS OTP claim in user's profile.
             if (isSMSOTPMandatory) {
                 if (log.isDebugEnabled()) {
@@ -184,6 +215,8 @@ public class SMSOTPAuthenticator extends AbstractApplicationAuthenticator implem
                 }
                 processSMSOTPMandatoryCase(context, request, response, queryParams, username, isUserExists);
             } else if (isUserExists && !SMSOTPUtils.isSMSOTPDisableForLocalUser(username, context)) {
+                log.error("otp initiateAuthenticationRequest: isUserExists && !SMSOTPUtils.isSMSOTPDisableForLocalUser(username, context) start");
+
                 if (context.isRetrying() && !Boolean.parseBoolean(request.getParameter(SMSOTPConstants.RESEND))
                         && !isMobileNumberUpdateFailed(context)) {
                     if (log.isDebugEnabled()) {
@@ -197,9 +230,14 @@ public class SMSOTPAuthenticator extends AbstractApplicationAuthenticator implem
                     }
 
                 }
+                log.error("otp initiateAuthenticationRequest: isUserExists && !SMSOTPUtils.isSMSOTPDisableForLocalUser(username, context) finish");
+
             } else {
+                log.error("otp initiateAuthenticationRequest: processFirstStepOnly");
+
                 processFirstStepOnly(authenticatedUser, context);
             }
+
         } catch (SMSOTPException e) {
             throw new AuthenticationFailedException("Failed to get the parameters from authentication xml file. ", e);
         } catch (UserStoreException e) {
